@@ -1,4 +1,4 @@
-𝙐𝙍𝙑𝙄 𝙂𝘼𝙈𝙀𝙍:
+
 const successMessage =
                     "PANEL ADDED SUCCESSFULLY\n\n" +
                     "Name: " + panel.name + "\n" +
