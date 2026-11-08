@@ -125,8 +125,7 @@ async function shutdown(signal) {
 
     isShuttingDown = true;
 
-    console.log(\n${signal} received. Shutting down bot...);
-
+    console.log("\n" + signal + " received. Shutting down bot...");
     try {
         if (bot) {
             await bot.stopPolling();
