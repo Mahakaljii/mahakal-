@@ -61,11 +61,11 @@ function extractUsername(input) {
     if (!input) return null;
     let clean = input.trim().toLowerCase();
     
+    // SAFE PARSING: Bina double split crash ke link clean up logic
     if (clean.includes('t.me/')) {
-        let parts = clean.split('t.me/');
-        if (parts && parts[1]) {
-            let subParts = parts[1].split('/');
-            clean = subParts[0];
+        clean = clean.split('t.me/')[1];
+        if (clean && clean.includes('/')) {
+            clean = clean.split('/')[0];
         }
     }
     
