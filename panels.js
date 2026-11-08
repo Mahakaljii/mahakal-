@@ -1,4 +1,4 @@
-𝙐𝙍𝙑𝙄 𝙂𝘼𝙈𝙀𝙍:
+
 // DELETE API KEY MESSAGE
             try {
                 await bot.deleteMessage(
