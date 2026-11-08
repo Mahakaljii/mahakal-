@@ -115,7 +115,7 @@ bot.on('channel_post', async (msg) => {
             return;
         }
 
-        const burst = [100, 230, 250];
+        const burst = [ 230 ];
         let allSuccessful = true;
 
         for (let qty of burst) {
