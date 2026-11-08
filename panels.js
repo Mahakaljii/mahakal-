@@ -1,86 +1,73 @@
+𝙐𝙍𝙑𝙄 𝙂𝘼𝙈𝙀𝙍:
+const successMessage =
+                    "PANEL ADDED SUCCESSFULLY\n\n" +
+                    "Name: " + panel.name + "\n" +
+                    "URL: " + panel.url + "\n" +
+                    "Status: " + panel.status + "\n\n" +
+                    "API Key: Stored securely.";
 
-// DELETE API KEY MESSAGE
-            try {
-                await bot.deleteMessage(
+                return bot.sendMessage(
                     msg.chat.id,
-                    msg.message_id
+                    successMessage
                 );
-            } catch (error) {
-                console.warn(
-                    "Could not delete API key message."
-                );
-            }
+            });
+        })
+        .catch(function (error) {
+
+            console.error("Panel save error:", error);
 
             return bot.sendMessage(
                 msg.chat.id,
-                PANEL ADDED SUCCESSFULLY
-
-Name: ${panel.name}
-URL: ${panel.url}
-Status: ${panel.status}
-
-API Key: Stored securely (hidden).
+                "Panel could not be added: " +
+                error.message
             );
-
-        } catch (error) {
-
-            return bot.sendMessage(
-                msg.chat.id,
-                Panel could not be added.
-
-Error: ${error.message}
-
-Please try again or use /cancelpanel.
-            );
-        }
+        });
     });
 
     // LIST PANELS
     bot.onText(
         /^\/panels(?:@\w+)?$/i,
-        async (msg) => {
+        function (msg) {
 
-            if (!isAuthorized(msg)) {
+            if (!authorized(msg)) {
                 return bot.sendMessage(
                     msg.chat.id,
                     "Access denied."
                 );
             }
 
-            if (!isPrivate(msg)) {
-                return;
-            }
-
             try {
 
                 const panels = listPanels();
 
-                if (!panels.length) {
+                if (!panels || panels.length === 0) {
                     return bot.sendMessage(
                         msg.chat.id,
                         "No SMM panels registered."
                     );
                 }
 
-                const output = panels.map((panel, index) => {
+                let output = "REGISTERED SMM PANELS\n\n";
 
-                    return ${index + 1}. ${panel.name}
-URL: ${panel.url}
-Status: ${panel.status}
-ID: ${panel.id};
+                panels.forEach(function (panel, index) {
 
+                    output +=
+                        (index + 1) + ". " +
+                        panel.name + "\n" +
+                        "URL: " + panel.url + "\n" +
+                        "Status: " + panel.status + "\n" +
+                        "ID: " + panel.id + "\n\n";
                 });
 
                 return bot.sendMessage(
                     msg.chat.id,
-                    "REGISTERED SMM PANELS\n\n" +
-                    output.join("\n\n")
+                    output
                 );
 
             } catch (error) {
                 return bot.sendMessage(
                     msg.chat.id,
-                    Error: ${error.message}
+                    "Panel list error: " + error.message
                 );
             }
         }
@@ -89,96 +76,113 @@ ID: ${panel.id};
     // GET PANEL DETAILS
     bot.onText(
         /^\/getpanel(?:@\w+)?\s+(.+)$/i,
-        async (msg, match) => {
+        function (msg, match) {
 
-            if (!isAuthorized(msg)) {
+            if (!authorized(msg)) {
                 return bot.sendMessage(
                     msg.chat.id,
                     "Access denied."
                 );
             }
 
-            if (!isPrivate(msg)) {
-                return;
-            }
+            try {
 
-            const name = match[1].trim().toLowerCase();
+                const name = match[1].trim().toLowerCase();
 
-            const panel = listPanels().find(
-                item => item.name.toLowerCase() === name
-            );
+                const panel = listPanels().find(
+                    function (item) {
+                        return item.name.toLowerCase() === name;
+                    }
+                );
 
-            if (!panel) {
+                if (!panel) {
+                    return bot.sendMessage(
+                        msg.chat.id,
+                        "Panel not found."
+                    );
+                }
+
+                const details =
+                    "PANEL DETAILS\n\n" +
+                    "Name: " + panel.name + "\n" +
+                    "URL: " + panel.url + "\n" +
+                    "Status: " + panel.status + "\n" +
+                    "ID: " + panel.id + "\n" +
+                    "API Key: Hidden";
+
                 return bot.sendMessage(
                     msg.chat.id,
-                    "Panel not found."
+                    details
+                );
+
+            } catch (error) {
+                return bot.sendMessage(
+                    msg.chat.id,
+                    "Panel details error: " + error.message
                 );
             }
-
-            return bot.sendMessage(
-                msg.chat.id,
-                PANEL DETAILS
-
-Name: ${panel.name}
-URL: ${panel.url}
-Status: ${panel.status}
-ID: ${panel.id}
-
-API Key: Hidden
-            );
         }
     );
 
     // REMOVE PANEL
     bot.onText(
         /^\/removepanel(?:@\w+)?\s+(.+)$/i,
-        async (msg, match) => {
+        function (msg, match) {
 
-            if (!isAuthorized(msg)) {
+            if (!authorized(msg)) {
                 return bot.sendMessage(
                     msg.chat.id,
                     "Access denied."
                 );
             }
 
-            if (!isPrivate(msg)) {
-                return;
-            }
-
-            const name = match[1].trim().toLowerCase();
-
-            const panel = listPanels().find(
-                item => item.name.toLowerCase() === name
-            );
-
-            if (!panel) {
-                return bot.sendMessage(
-                    msg.chat.id,
-                    "Panel not found."
-                );
-            }
-
             try {
 
-                await removePanel(panel.id);
+                const name = match[1].trim().toLowerCase();
 
-                return bot.sendMessage(
-                    msg.chat.id,
-                    Panel removed successfully: ${panel.name}
+                const panel = listPanels().find(
+                    function (item) {
+                        return item.name.toLowerCase() === name;
+                    }
                 );
 
-            } catch (error) {
+if (!panel) {
+                    return bot.sendMessage(
+                        msg.chat.id,
+                        "Panel not found."
+                    );
+                }
 
+                return removePanel(panel.id)
+                    .then(function () {
+
+                        return bot.sendMessage(
+                            msg.chat.id,
+                            "Panel removed successfully: " +
+                            panel.name
+                        );
+                    })
+                    .catch(function (error) {
+
+                        return bot.sendMessage(
+                            msg.chat.id,
+                            "Panel removal failed: " +
+                            error.message
+                        );
+                    });
+
+            } catch (error) {
                 return bot.sendMessage(
                     msg.chat.id,
-                    Error: ${error.message}
+                    "Error: " + error.message
                 );
             }
         }
     );
 
+    console.log("Panel commands registered successfully.");
 }
 
 module.exports = {
-    registerPanelCommands
+    registerPanelCommands: registerPanelCommands
 };
