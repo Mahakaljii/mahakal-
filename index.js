@@ -27,7 +27,7 @@ console.log('Bot Started Successfully and Polling...');
 
 // YOUR CHANNELS
 const CHANNELS = [
-    '@TRICKVIP,
+    '@TRICKVIP',
     '@LIONMODEON',
     '@GROW_MASTER',
     '@VIPGODGAMER',
