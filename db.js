@@ -1,40 +1,22 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-// Database file path setup
 const dbPath = path.resolve(__dirname, 'bot_database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
     // 1. PANELS TABLE
-    db.run(CREATE TABLE IF NOT EXISTS panels (
-        name TEXT PRIMARY KEY,
-        url TEXT,
-        api_key TEXT
-    ));
+    db.run('CREATE TABLE IF NOT EXISTS panels (name TEXT PRIMARY KEY, url TEXT, api_key TEXT)');
 
-    // Default SMMILITE Panel insert karein agar pehle se nahi hai
-    db.run(INSERT OR IGNORE INTO panels (name, url, api_key) VALUES (?, ?, ?), 
+    // Default SMMILITE Panel insert karein
+    db.run('INSERT OR IGNORE INTO panels (name, url, api_key) VALUES (?, ?, ?)', 
         ["SMMILITE", "https://smmlite.com", process.env.API_KEY || ""]);
 
     // 2. CHANNELS CONFIG TABLE
-    db.run(CREATE TABLE IF NOT EXISTS channels (
-        username TEXT PRIMARY KEY,
-        quantity INTEGER DEFAULT 10,
-        status TEXT DEFAULT 'ON',
-        service_number TEXT DEFAULT '5160',
-        panel_name TEXT DEFAULT 'SMMILITE'
-    ));
+    db.run('CREATE TABLE IF NOT EXISTS channels (username TEXT PRIMARY KEY, quantity INTEGER DEFAULT 10, status TEXT DEFAULT "ON", service_number TEXT DEFAULT "5160", panel_name TEXT DEFAULT "SMMILITE")');
 
     // 3. REPORTS/LOGS TABLE
-    db.run(CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel TEXT,
-        link TEXT,
-        quantity INTEGER,
-        status TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    ));
+    db.run('CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, link TEXT, quantity INTEGER, status TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)');
 });
 
 // Helper functions for Promise-based Database queries
