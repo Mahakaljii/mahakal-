@@ -1,3 +1,5 @@
+"use strict";
+
 const {
     getStore,
     listPanels,
@@ -7,9 +9,14 @@ const {
 
 function registerServiceCommands(bot, isOwner) {
 
-    // Security: Owner commands only in private chat.
+    if (typeof isOwner !== "function") {
+        throw new Error("Service module requires an owner authorization function.");
+    }
+
+    // Owner security check
     function authorized(msg) {
         return (
+            msg.chat &&
             msg.chat.type === "private" &&
             msg.from &&
             isOwner(msg.from.id)
@@ -28,7 +35,7 @@ function registerServiceCommands(bot, isOwner) {
                 );
             }
 
-            const username = match[1];
+            const username = match[1].replace(/^@/, "");
             const panelName = match[2];
             const serviceId = match[3];
 
@@ -52,15 +59,19 @@ function registerServiceCommands(bot, isOwner) {
 
                 return bot.sendMessage(
                     msg.chat.id,
-                    CHANNEL SERVICE CONFIGURED\n\n +
-                    Channel: @${channel.username}\n +
-                    Panel: ${panel.name}\n +
-                    Service ID: ${serviceId}\n +
-                    Channel Status: ${channel.status}\n\n +
-                    Configuration saved successfully.
+                    CHANNEL SERVICE CONFIGURED
+
+Channel: @${channel.username}
+Panel: ${panel.name}
+Service ID: ${serviceId}
+Channel Status: ${channel.status}
+
+Configuration saved successfully.
                 );
 
             } catch (error) {
+                console.error("Channel service configuration error:", error);
+
                 return bot.sendMessage(
                     msg.chat.id,
                     Service configuration failed:\n${error.message}
@@ -85,7 +96,7 @@ function registerServiceCommands(bot, isOwner) {
                 const data = getStore();
                 const panels = listPanels();
 
-                if (!data.channels.length) {
+                if (!data.channels || !data.channels.length) {
                     return bot.sendMessage(
                         msg.chat.id,
                         "No channels registered."
@@ -126,6 +137,8 @@ function registerServiceCommands(bot, isOwner) {
                 );
 
             } catch (error) {
+                console.error("Channel service listing error:", error);
+
                 return bot.sendMessage(
                     msg.chat.id,
                     Error: ${error.message}
@@ -147,18 +160,22 @@ function registerServiceCommands(bot, isOwner) {
             }
 
             try {
-                const username = match[1];
+                const username = match[1].replace(/^@/, "");
 
                 await removeChannelService(username);
 
                 return bot.sendMessage(
                     msg.chat.id,
-                    Channel service configuration removed.\n\n +
-                    Channel: ${username}\n +
-                    Channel itself has NOT been deleted.
+                    Channel service configuration removed.
+
+Channel: @${username}
+
+Channel itself has NOT been deleted.
                 );
 
             } catch (error) {
+                console.error("Channel service removal error:", error);
+
                 return bot.sendMessage(
                     msg.chat.id,
                     Removal failed:\n${error.message}
@@ -166,6 +183,8 @@ function registerServiceCommands(bot, isOwner) {
             }
         }
     );
+
+    console.log("Service commands registered.");
 }
 
 module.exports = {
