@@ -3,30 +3,13 @@
 const TelegramBot = require("node-telegram-bot-api");
 
 const { CONFIG } = require("./config");
+const { initializeStorage } = require("./storage");
 
-const {
-    initializeStorage
-} = require("./storage");
-
-const {
-    registerPanelCommands
-} = require("./panels");
-
-const {
-    registerChannelCommands
-} = require("./channels");
-
-const {
-    registerServiceCommands
-} = require("./services");
-
-const {
-    registerReportCommands
-} = require("./reports");
-
-const {
-    registerAdminCommands
-} = require("./admin");
+const { registerPanelCommands } = require("./panels");
+const { registerChannelCommands } = require("./channels");
+const { registerServiceCommands } = require("./service");
+const { registerReportCommands } = require("./reports");
+const { registerAdminCommands } = require("./admin");
 
 let bot = null;
 let isShuttingDown = false;
@@ -35,11 +18,14 @@ let isShuttingDown = false;
  * Validate application configuration
  */
 function validateConfig() {
-    if (!CONFIG.BOT_TOKEN) {
+    if (!CONFIG || !CONFIG.BOT_TOKEN) {
         throw new Error("BOT_TOKEN is missing.");
     }
 
-    if (!CONFIG.OWNER_ID || !Number.isSafeInteger(Number(CONFIG.OWNER_ID))) {
+    if (
+        !CONFIG.OWNER_ID ||
+        !Number.isSafeInteger(Number(CONFIG.OWNER_ID))
+    ) {
         throw new Error("Valid OWNER_ID is required.");
     }
 }
@@ -69,7 +55,7 @@ function registerModules(botInstance) {
 }
 
 /**
- * Global Telegram bot error handlers
+ * Global error handlers
  */
 function registerErrorHandlers(botInstance) {
     botInstance.on("polling_error", (error) => {
@@ -94,28 +80,20 @@ async function startBot() {
         console.log("Telegram SMM Bot Starting...");
         console.log("--------------------------------");
 
-        // Step 1: Validate configuration
         validateConfig();
-
         console.log("Configuration validated.");
 
-        // Step 2: Initialize JSON storage
         await initializeStorage();
-
         console.log("Storage initialized.");
 
-        // Step 3: Create Telegram bot without starting polling
         bot = new TelegramBot(CONFIG.BOT_TOKEN, {
             polling: false
         });
 
-        // Step 4: Register error handlers
         registerErrorHandlers(bot);
 
-        // Step 5: Register all modules
         registerModules(bot);
 
-        // Step 6: Start Telegram polling
         await bot.startPolling();
 
         console.log("--------------------------------");
@@ -155,7 +133,6 @@ async function shutdown(signal) {
         }
 
         console.log("Bot stopped successfully.");
-
         process.exit(0);
 
     } catch (error) {
@@ -175,7 +152,6 @@ process.on("unhandledRejection", (reason) => {
 
 process.on("uncaughtException", (error) => {
     console.error("Uncaught Exception:", error);
-
     shutdown("UNCAUGHT_EXCEPTION");
 });
 
