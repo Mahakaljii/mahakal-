@@ -33,7 +33,7 @@ function helpText() {
 }
 
 function parseCommand(text) {
-  const match = text.match(/^\\/(\\w+)(?:@\\w+)?(?:\\s+([\\s\\S]*))?$/);
+  const parts = args.split(/\\s+/);
   return match ? { command: match[1].toLowerCase(), args: (match[2] || "").trim() } : null;
 }
 
