@@ -5,24 +5,23 @@ function isOwner(msg) {
     return msg.from.id.toString() === OWNER_ID.toString();
 }
 
-// Kisi bhi type ke input (link ya username) se standard clean @username nikalne ke liye
 function extractUsername(input) {
     if (!input) return null;
     let clean = input.trim().toLowerCase();
     
-    // Agar text t.me/ ke sath link format mein hai
+    // Agar input complete HTTP ya Telegram link hai (e.g., https://t.me)
     if (clean.includes('t.me/')) {
-        let parts = clean.split('t.me/')[1].split('/');
-        clean = parts[0]; // Channel ka core username mil jayega
+        let parts = clean.split('t.me/');
+        if (parts[1]) {
+            let subParts = parts[1].split('/');
+            clean = subParts[0]; // Sirf core username nikalenge, post ID ko chodd kar
+        }
     }
     
-    // Agar username format hai to ensure karein ki aage @ laga ho
-    clean = clean.replace('https://', '').replace('http://', '');
-    if (!clean.startsWith('@')) {
-        clean = '@' + clean;
-    }
+    // Baki extra symbols clear karein
+    clean = clean.replace('https://', '').replace('http://', '').replace('@', '');
     
-    return clean;
+    return '@' + clean;
 }
 
 module.exports = { isOwner, extractUsername };
