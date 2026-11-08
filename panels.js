@@ -63,7 +63,7 @@ function registerPanelCommands(bot, isOwner) {
 
             return bot.sendMessage(
                 msg.chat.id,
-                Panel: ${name}
+                'Panel: ${name}'
 URL: ${url}
 
 Now send the API key in your next private message.
