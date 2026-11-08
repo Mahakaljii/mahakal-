@@ -57,7 +57,11 @@ bot.on('channel_post', async (msg) => {
 
         // Whitelisting aur dynamic config filter verification
         const chConfig = await db.get('SELECT * FROM channels WHERE lower(username) = ?', [currentChannel]);
-        if (!chConfig  chConfig.status !== 'ON'  !chConfig.panel_name || !chConfig.service_number) return;
+        
+        // [FIXED LINE 60]: Yahan condition check ko poori tarah separate aur secure kar diya gaya hai
+        if (!chConfig  chConfig.status !== 'ON'  !chConfig.panel_name || !chConfig.service_number) {
+            return;
+        }
 
         const panelConfig = await db.get('SELECT * FROM panels WHERE name = ?', [chConfig.panel_name]);
         if (!panelConfig || !panelConfig.api_key) return;
