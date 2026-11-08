@@ -1,139 +1,742 @@
-const { isOwner, normalizeChannel } = require("./utils");
-const { addChannel, removeChannel, listChannels, findChannelByUsername, setMonitoring } = require("./channels");
-const { addPanel, getAllPanels, removePanel } = require("./panels");
-const { assignService, listServices, removeService } = require("./services");
-const { getReport } = require("./reports");
+GOD TRADERS:
+const {
+  isOwner,
+  normalizeChannel
+} = require("./utils");
+
+const {
+  addChannel,
+  removeChannel,
+  listChannels,
+  findChannelByUsername,
+  setMonitoring
+} = require("./channels");
+
+const {
+  addPanel,
+  getAllPanels,
+  removePanel
+} = require("./panels");
+
+const {
+  assignService,
+  listServices,
+  removeService
+} = require("./services");
+
+const {
+  getReport
+} = require("./reports");
+
+
+/**
+ * OWNER HELP COMMANDS
+ */
 
 function helpText() {
   return [
-    "OWNER COMMANDS",
-    "/myid",
+    "🚀 TELEGRAM SMM MANAGEMENT BOT",
+    "",
+    "1. CHANNEL RULES & MONITORING",
+    "",
     "/addchannel @username",
     "/removechannel @username",
+    "/setqty @username number",
+    "/getqty @username",
+    "/startqty @username",
+    "/stopqty @username",
     "/channels",
-    "/startqty @username  (starts channel post monitoring)",
-    "/stopqty @username   (stops channel post monitoring)",
-    "/getqty @username    (shows monitoring and service mapping status)",
-    "/newpanel Name | https://provider.example/api | API_KEY",
+    "",
+    "2. PANEL MANAGEMENT",
+    "",
+    "/newpanel Name | https://panel.example/api | API_KEY",
     "/allpanellist",
     "/removepanel PANEL_ID",
+    "",
+    "3. CHANNEL SERVICE MAPPING",
+    "",
     "/channelservice @username PANEL_ID SERVICE_ID",
     "/allservicelist",
     "/channelservicelist",
     "/serviceremove @username",
+    "",
+    "4. REPORTS",
+    "",
     "/reportday [@username]",
     "/report24 [@username]",
     "/report72 [@username]",
     "/reportweek [@username]",
     "/reportmonth [@username]",
+    "",
+    "5. UTILITIES",
+    "",
+    "/myid",
     "/qtyhelp",
     "",
-    "Note: This build monitors channel posts and reports activity. It does not place paid views, likes, reactions, or other artificial-engagement orders."
-  ].join("\\n");
+    "Note: This build supports channel-post monitoring, configuration records and activity reports. It does not submit paid artificial views, likes, reactions or engagement orders."
+  ].join("\n");
 }
+
+
+/**
+ * TELEGRAM COMMAND PARSER
+ */
 
 function parseCommand(text) {
-  const parts = args.split(/\\s+/);
-  return match ? { command: match[1].toLowerCase(), args: (match[2] || "").trim() } : null;
+
+  if (typeof text !== "string") {
+    return null;
+  }
+
+  const match = text.trim().match(
+    /^\/([a-zA-Z0-9_]+)(?:@[a-zA-Z0-9_]+)?(?:\s+([\s\S]*))?$/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    command: match[1].toLowerCase(),
+    args: (match[2] || "").trim()
+  };
 }
 
-async function handleAdminMessage(bot, msg) {
-  const text = msg.text || "";
-  const parsed = parseCommand(text);
-  if (!parsed) return false;
 
-  const { command, args } = parsed;
+/**
+ * FORMAT CHANNEL LIST
+ */
+
+function formatChannelList(channels) {
+
+  if (!Array.isArray(channels) || channels.length === 0) {
+    return "No channels registered yet.";
+  }
+
+  return channels.map((channel, index) => {
+
+    const title = channel.title || "Untitled channel";
+
+    const username = channel.username
+      ? @${channel.username}
+      : "No public username";
+
+    const status = channel.monitoring
+      ? "🟢 Monitoring ON"
+      : "🔴 Monitoring OFF";
+
+    return ${index + 1}. ${title}\n${username}\n${status};
+
+  }).join("\n\n");
+}
+
+
+/**
+ * FORMAT PANEL LIST
+ */
+
+function formatPanelList(panels) {
+
+  if (!Array.isArray(panels) || panels.length === 0) {
+    return "No panels saved yet.";
+  }
+
+  return panels.map((panel, index) => {
+
+    return [
+      ${index + 1}. ${panel.name || "Unnamed panel"},
+      ID: ${panel.id || "Not available"},
+      URL: ${panel.apiUrl || "Not available"}
+    ].join("\n");
+
+  }).join("\n\n");
+}
+
+
+/**
+ * FORMAT SERVICE LIST
+ */
+
+function formatServiceList(mappings) {
+
+  if (!Array.isArray(mappings) || mappings.length === 0) {
+    return "No service mappings configured.";
+  }
+
+  return mappings.map((mapping, index) => {
+
+    return [
+      ${index + 1}. @${mapping.channelUsername || "unknown"},
+      Panel: ${mapping.panelName || "Not mapped"},
+      Service ID: ${mapping.serviceId || "Not mapped"}
+    ].join("\n");
+
+  }).join("\n\n");
+}
+
+
+/**
+ * MAIN ADMIN MESSAGE HANDLER
+ */
+
+async function handleAdminMessage(bot, msg) {
+
+  if (!msg  !msg.chat  !msg.from) {
+    return false;
+  }
+
+  const parsed = parseCommand(msg.text || "");
+
+  if (!parsed) {
+    return false;
+  }
+
+  const command = parsed.command;
+
+  const args = parsed.args;
+
   const chatId = msg.chat.id;
-  const reply = value => bot.sendMessage(chatId, value);
+
+  const reply = async (message) => {
+    return bot.sendMessage(chatId, String(message));
+  };
+
+
+  /**
+   * MY ID COMMAND
+   */
 
   if (command === "myid") {
-    await reply(`Your Telegram ID: ${msg.from.id}`);
+
+    await reply(
+      Your Telegram ID: ${msg.from.id}
+    );
+
     return true;
   }
+
+
+  /**
+   * OWNER SECURITY CHECK
+   */
 
   if (!isOwner(msg.from.id)) {
-    await reply("⛔ This command is restricted to the owner admin.");
+
+    await reply(
+      "⛔ This command is restricted to the owner admin."
+    );
+
     return true;
   }
 
+
   try {
-    if (["start", "qtyhelp", "help"].includes(command)) {
-      await reply(helpText());
-    } else if (command === "addchannel") {
-      const username = normalizeChannel(args);
-      if (!username) throw new Error("Usage: /addchannel @public_channel");
-      const chat = await bot.getChat(`@${username}`);
-      const me = await bot.getMe();
-      const member = await bot.getChatMember(chat.id, me.id);
-      if (!["administrator", "creator"].includes(member.status)) {
-        throw new Error("Please add the bot as an administrator in that channel first.");
+
+    switch (command) {
+
+
+      /**
+       * HELP COMMANDS
+       */
+
+      case "start":
+      case "help":
+      case "qtyhelp": {
+
+        await reply(helpText());
+
+        break;
       }
-      const added = addChannel(chat);
-      await reply(`✅ Channel registered: ${added.title} (@${added.username})\\nPost monitoring is ON.`);
-    } else if (command === "removechannel") {
-      if (!removeChannel(args)) throw new Error("Channel not found. Use /channels.");
-      await reply("✅ Channel and its service mapping removed.");
-    } else if (command === "channels") {
-      const channels = listChannels();
-      await reply(channels.length ? channels.map((c, i) =>
-        `${i + 1}. ${c.title} (@${c.username}) — ${c.monitoring ? "🟢 Monitoring ON" : "🔴 Monitoring OFF"}`
-      ).join("\\n") : "No channels registered yet.");
-    } else if (command === "startqty" || command === "stopqty") {
-      if (!args) throw new Error(`Usage: /${command} @username`);
-      const updated = setMonitoring(args, command === "startqty");
-      await reply(`✅ @${updated.username} post monitoring ${updated.monitoring ? "enabled" : "disabled"}.`);
-    } else if (command === "getqty") {
-      const channel = findChannelByUsername(args);
-      if (!channel) throw new Error("Channel not found.");
-      const mapping = listServices().find(s => s.channelId === channel.id);
-      await reply(
-        `Channel: @${channel.username}\\nMonitoring: ${channel.monitoring ? "ON" : "OFF"}\\n` +
-        `Provider: ${mapping?.panelName || "Not mapped"}\\nService reference: ${mapping?.serviceId || "Not mapped"}\\n` +
-        "Paid engagement quantity/order automation is not enabled in this build."
-      );
-    } else if (command === "newpanel") {
-      const parts = args.split("|").map(s => s.trim());
-      if (parts.length !== 3) throw new Error("Usage: /newpanel Name | https://provider.example/api | API_KEY");
-      const panel = addPanel(parts[0], parts[1], parts[2]);
-      await reply(`✅ Provider saved.\\nName: ${panel.name}\\nID: ${panel.id}\\nAPI key is encrypted and will not be displayed.`);
-    } else if (command === "allpanellist") {
-      const panels = getAllPanels();
-      await reply(panels.length ? panels.map((p, i) => `${i + 1}. ${p.name}\\nID: ${p.id}\\nURL: ${p.apiUrl}`).join("\\n\\n") : "No providers saved.");
-    } else if (command === "removepanel") {
-      if (!args) throw new Error("Usage: /removepanel PANEL_ID");
-      if (!removePanel(args)) throw new Error("Provider ID not found.");
-      await reply("✅ Provider removed.");
-    } else if (command === "channelservice") {
-      const parts = args.split(/\\s+/);
-      if (parts.length !== 3) throw new Error("Usage: /channelservice @username PANEL_ID SERVICE_ID");
-      const mapping = assignService(parts[0], parts[1], parts[2]);
-      await reply(`✅ Service reference mapped to @${mapping.channelUsername}. No order will be submitted.`);
-    } else if (command === "allservicelist" || command === "channelservicelist") {
-      const mappings = listServices();
-      await reply(mappings.length ? mappings.map((m, i) =>
-        `${i + 1}. @${m.channelUsername}\\nProvider: ${m.panelName}\\nService: ${m.serviceId}`
-      ).join("\\n\\n") : "No service mappings configured.");
-    } else if (command === "serviceremove") {
-      if (!removeService(args)) throw new Error("No service mapping found for this channel.");
-      await reply("✅ Service mapping removed.");
-    } else if (["reportday", "report24", "report72", "reportweek", "reportmonth"].includes(command)) {
-      const hours = { report24: 24, report72: 72, reportweek: 168, reportmonth: 720 }[command] || null;
-      const today = command === "reportday";
-      const username = args ? normalizeChannel(args) : null;
-      if (args && !username) throw new Error("Use a public channel username, e.g. /report24 @channel");
-      const report = getReport({ hours, today, channelUsername: username });
-      await reply(
-        `📊 ${command.toUpperCase()}\\nScope: ${report.channel}\\n` +
-        `Detected channel posts: ${report.postsDetected}\\nFrom: ${report.from}\\nTo: ${report.to}\\n` +
-        "These are post-detection metrics, not paid SMM order-delivery metrics."
-      );
-    } else {
-      await reply("Unknown command. Send /qtyhelp for the command list.");
+
+
+      /**
+       * ADD CHANNEL
+       */
+
+      case "addchannel": {
+
+        const username = normalizeChannel(args);
+
+        if (!username) {
+          throw new Error(
+            "Usage: /addchannel @public_channel"
+          );
+        }
+
+        const chat = await bot.getChat(@${username});
+
+        const botInfo = await bot.getMe();
+
+        const botMember = await bot.getChatMember(
+          chat.id,
+          botInfo.id
+        );
+
+        if (
+          botMember.status !== "administrator" &&
+          botMember.status !== "creator"
+        ) {
+
+          throw new Error(
+            "Please add this bot as an administrator in the channel first."
+          );
+        }
+
+        const addedChannel = addChannel(chat);
+
+        await reply(
+          ✅ Channel registered successfully.\n +
+          Name: ${addedChannel.title || chat.title || "Untitled"}\n +
+          Username: @${addedChannel.username || username}\n +
+          "Post monitoring is enabled."
+        );
+
+        break;
+      }
+
+
+      /**
+       * REMOVE CHANNEL
+       */
+
+      case "removechannel": {
+
+        if (!args) {
+          throw new Error(
+            "Usage: /removechannel @username"
+          );
+        }
+
+        const removed = removeChannel(args);
+
+        if (!removed) {
+          throw new Error(
+            "Channel not found. Use /channels to view registered channels."
+          );
+        }
+
+        await reply(
+          "✅ Channel and its associated service mapping were removed."
+        );
+
+        break;
+      }
+
+
+      /**
+       * CHANNEL LIST
+       */
+
+      case "channels": {
+
+        const channels = listChannels();
+
+        await reply(
+          formatChannelList(channels)
+        );
+
+        break;
+      }
+
+
+      /**
+       * SET QUANTITY
+       */
+
+      case "setqty": {
+
+        const parts = args.split(/\s+/).filter(Boolean);
+
+        if (parts.length !== 2) {
+
+          throw new Error(
+            "Usage: /setqty @username number"
+          );
+        }
+
+        const username = normalizeChannel(parts[0]);
+
+        const quantity = Number(parts[1]);
+
+        if (
+          !username ||
+          !Number.isSafeInteger(quantity) ||
+          quantity <= 0
+        ) {
+
+          throw new Error(
+            "Please provide a valid public username and positive whole number."
+          );
+        }
+
+        const channel = findChannelByUsername(username);
+
+        if (!channel) {
+
+          throw new Error(
+            "Channel not found. Add it first using /addchannel."
+          );
+        }
+
+        await reply(
+          ℹ️ Quantity target received: ${quantity} for @${username}.\n +
+          "This build records channel monitoring and service metadata only; it does not submit paid engagement orders."
+        );
+
+        break;
+      }
+
+
+      /**
+       * START / STOP MONITORING
+       */
+
+      case "startqty":
+      case "stopqty": {
+
+        if (!args) {
+
+          throw new Error(
+            Usage: /${command} @username
+          );
+        }
+
+        const updatedChannel = setMonitoring(
+          args,
+          command === "startqty"
+        );
+
+        await reply(
+          ✅ Post monitoring for @${updatedChannel.username} is  +
+          ${updatedChannel.monitoring ? "ON 🟢" : "OFF 🔴"}.
+        );
+
+        break;
+      }
+
+
+      /**
+       * GET CHANNEL STATUS
+       */
+
+      case "getqty": {
+
+        if (!args) {
+
+          throw new Error(
+            "Usage: /getqty @username"
+          );
+        }
+
+        const channel = findChannelByUsername(args);
+
+        if (!channel) {
+
+          throw new Error(
+            "Channel not found."
+          );
+        }
+
+        const mapping = listServices().find(
+          (service) => service.channelId === channel.id
+        );
+
+await reply(
+          📌 CHANNEL DETAILS\n\n +
+          Channel: @${channel.username}\n +
+          Title: ${channel.title || "Not available"}\n +
+          Monitoring: ${channel.monitoring ? "ON 🟢" : "OFF 🔴"}\n +
+          Panel: ${mapping ? mapping.panelName : "Not mapped"}\n +
+          Service ID: ${mapping ? mapping.serviceId : "Not mapped"}\n\n +
+          "Paid engagement quantity/order automation is not enabled in this build."
+        );
+
+        break;
+      }
+
+
+      /**
+       * ADD NEW PANEL
+       */
+
+      case "newpanel": {
+
+        const parts = args.split("|").map(
+          (part) => part.trim()
+        );
+
+        if (
+          parts.length !== 3 ||
+          !parts[0] ||
+          !parts[1] ||
+          !parts[2]
+        ) {
+
+          throw new Error(
+            "Usage: /newpanel Name | https://panel.example/api | API_KEY"
+          );
+        }
+
+        if (!/^https?:\/\//i.test(parts[1])) {
+
+          throw new Error(
+            "Panel API URL must begin with http:// or https://"
+          );
+        }
+
+        const panel = addPanel(
+          parts[0],
+          parts[1],
+          parts[2]
+        );
+
+        await reply(
+          ✅ Panel configuration saved.\n +
+          Name: ${panel.name}\n +
+          ID: ${panel.id}\n +
+          "The API key is not displayed in chat."
+        );
+
+        break;
+      }
+
+
+      /**
+       * ALL PANEL LIST
+       */
+
+      case "allpanellist": {
+
+        const panels = getAllPanels();
+
+        await reply(
+          formatPanelList(panels)
+        );
+
+        break;
+      }
+
+
+      /**
+       * REMOVE PANEL
+       */
+
+      case "removepanel": {
+
+        if (!args) {
+
+          throw new Error(
+            "Usage: /removepanel PANEL_ID"
+          );
+        }
+
+        const removed = removePanel(args);
+
+        if (!removed) {
+
+          throw new Error(
+            "Panel ID not found."
+          );
+        }
+
+        await reply(
+          "✅ Panel configuration removed."
+        );
+
+        break;
+      }
+
+
+      /**
+       * CHANNEL SERVICE MAPPING
+       */
+
+      case "channelservice": {
+
+        const parts = args.split(/\s+/).filter(Boolean);
+
+        if (parts.length !== 3) {
+
+          throw new Error(
+            "Usage: /channelservice @username PANEL_ID SERVICE_ID"
+          );
+        }
+
+        const username = normalizeChannel(parts[0]);
+
+        if (!username) {
+
+          throw new Error(
+            "Please provide a valid public channel username."
+          );
+        }
+
+        const mapping = assignService(
+          username,
+          parts[1],
+          parts[2]
+        );
+
+        await reply(
+          ✅ Service mapping saved for @${mapping.channelUsername}.\n +
+          Panel: ${mapping.panelName}\n +
+          Service ID: ${mapping.serviceId}\n\n +
+          "This mapping is configuration metadata; no paid order is submitted."
+        );
+
+        break;
+      }
+
+
+      /**
+       * ALL SERVICE LIST
+       */
+
+      case "allservicelist":
+      case "channelservicelist": {
+
+        const mappings = listServices();
+
+        await reply(
+          formatServiceList(mappings)
+        );
+
+        break;
+      }
+
+
+      /**
+       * REMOVE SERVICE
+       */
+
+      case "serviceremove": {
+
+        if (!args) {
+
+          throw new Error(
+            "Usage: /serviceremove @username"
+          );
+        }
+
+        const removed = removeService(args);
+
+        if (!removed) {
+
+          throw new Error(
+            "No service mapping found for this channel."
+          );
+        }
+
+        await reply(
+          "✅ Channel service mapping removed."
+        );
+
+        break;
+      }
+
+
+      /**
+       * REPORTS SYSTEM
+       */
+
+      case "reportday":
+      case "report24":
+      case "report72":
+      case "reportweek":
+      case "reportmonth": {
+
+        const reportHours = {
+
+          report24: 24,
+
+          report72: 72,
+
+          reportweek: 24 * 7,
+
+          reportmonth: 24 * 30
+
+        };
+
+        const hours = reportHours[command] || null;
+
+        const today = command === "reportday";
+
+        const username = args
+          ? normalizeChannel(args)
+          : null;
+
+        if (args && !username) {
+
+          throw new Error(
+            "Use a public channel username, for example: /report24 @channel"
+          );
+        }
+
+        const report = getReport({
+
+          hours,
+
+          today,
+
+          channelUsername: username
+
+        });
+
+        await reply(
+          📊 ${command.toUpperCase()} REPORT\n\n +
+          Scope: ${report.channel || "All channels"}\n +
+          Detected channel posts: ${report.postsDetected ?? 0}\n +
+          From: ${report.from || "Not available"}\n +
+          To: ${report.to || "Not available"}\n\n +
+          "These figures represent detected channel posts, not paid SMM order-delivery metrics."
+        );
+
+        break;
+      }
+
+
+      /**
+       * UNKNOWN COMMAND
+       */
+
+      default: {
+
+        await reply(
+          "Unknown command.\nSend /qtyhelp to see all available commands."
+        );
+
+        break;
+      }
+
     }
+
   } catch (error) {
-    await reply(`⚠️ ${error.message}`);
+
+    console.error(
+      Admin command error (/ ${command}):,
+      error && error.stack ? error.stack : error
+    );
+
+    await reply(
+      ⚠️ ${error.message || "An unexpected error occurred."}
+    );
+
   }
+
   return true;
 }
 
-module.exports = { handleAdminMessage, helpText };
+
+/**
+ * EXPORT MODULES
+ */
+
+module.exports = {
+
+  handleAdminMessage,
+
+  helpText,
+
+  parseCommand
+
+};
