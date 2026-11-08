@@ -7,8 +7,6 @@ const db = new sqlite3.Database(dbPath);
 db.serialize(() => {
     // 1. PANELS TABLE
     db.run('CREATE TABLE IF NOT EXISTS panels (name TEXT PRIMARY KEY, url TEXT, api_key TEXT)');
-
-    // Default SMMILITE Panel insert karein
     db.run('INSERT OR IGNORE INTO panels (name, url, api_key) VALUES (?, ?, ?)', 
         ["SMMILITE", "https://smmlite.com", process.env.API_KEY || ""]);
 
@@ -19,7 +17,6 @@ db.serialize(() => {
     db.run('CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, link TEXT, quantity INTEGER, status TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)');
 });
 
-// Helper functions for Promise-based Database queries
 const dbQuery = {
     run: (sql, params = []) => new Promise((res, rej) => {
         db.run(sql, params, function(err) {
