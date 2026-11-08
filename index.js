@@ -209,3 +209,233 @@ state.targetPanel = selectedPanel;
 
             await db.run(UPDATE channels SET service_number = NULL, panel_name = NULL WHERE username = ?, [channel]);
             delete userStates[userId];
+
+// ==========================================
+// 📊 REPORTS ENGINE (TIME-BASED ANALYTICS)
+// ==========================================
+
+// Helper function: SQL Query Filter ke liye timestamps aur intervals check karne ko
+async function generateReport(chatId, commandType, targetChannel = null) {
+    let timeInterval = '';
+    let headline = '';
+
+    switch (commandType) {
+        case 'day':
+            timeInterval = "date(timestamp) = date('now', 'localtime')";
+            headline = "Today's Live Report";
+            break;
+        case '24':
+            timeInterval = "timestamp >= datetime('now', '-24 hours', 'localtime')";
+            headline = "Last 24 Hours Report";
+            break;
+        case '72':
+            timeInterval = "timestamp >= datetime('now', '-72 hours', 'localtime')";
+            headline = "Last 72 Hours Report";
+            break;
+        case 'week':
+            timeInterval = "timestamp >= datetime('now', '-7 days', 'localtime')";
+            headline = "Last 7 Days Report";
+            break;
+        case 'month':
+            timeInterval = "timestamp >= datetime('now', '-30 days', 'localtime')";
+            headline = "Last 30 Days Report";
+            break;
+        default:
+            timeInterval = "date(timestamp) = date('now', 'localtime')";
+            headline = "Report";
+    }
+
+    let query = SELECT COUNT(*) as total_orders, SUM(quantity) as total_qty FROM logs WHERE ${timeInterval};
+    let params = [];
+
+    if (targetChannel) {
+        query +=  AND lower(channel) = ?;
+        params.push(targetChannel.toLowerCase());
+        headline +=  for ${targetChannel};
+    }
+
+    try {
+        const stats = await db.get(query, params);
+        let detailQuery = SELECT channel, SUM(quantity) as qty, COUNT(*) as cnt FROM logs WHERE ${timeInterval};
+        if (targetChannel) detailQuery +=  AND lower(channel) = ?;
+        detailQuery +=  GROUP BY channel;
+
+        const details = await db.all(detailQuery, params);
+
+        let reportText = 📊 **${headline.toUpperCase()}**\n\n;
+        reportText += 📈 **Total Successful Orders:** ${stats.total_orders || 0}\n;
+        reportText += 🔢 **Total Accumulated Quantity:** ${stats.total_qty || 0}\n\n;
+
+        if (details.length > 0) {
+            reportText += 📌 **Channel Wise Breakdowns:**\n;
+            details.forEach(d => {
+                reportText += 🔹 ${d.channel} ➡️ Orders: ${d.cnt} | Qty: ${d.qty}\n;
+            });
+        } else {
+            reportText += ⚠️ Diye gaye time frame mein koyi orders track nahi hue.;
+        }
+
+        bot.sendMessage(chatId, reportText, { parse_mode: 'Markdown' });
+    } catch (err) {
+        console.error("Report Generation Error: ", err.message);
+        bot.sendMessage(chatId, "❌ Report generate karne mein koyi internal database issue aaya.");
+    }
+}
+
+// Global Regex Handler for Reports commands (supports optionals [@channel])
+bot.onText(/\/(reportday|report24|report72|reportweek|reportmonth)(?:\s+(.+))?/, async (msg, match) => {
+    if (!isOwner(msg)) return bot.sendMessage(msg.chat.id, "❌ Access Denied!");
+    
+    const cmdType = match[1].replace('report', ''); // Extract day, 24, 72, week, month
+    let targetChannel = match[2] ? match[2].trim() : null;
+
+    if (targetChannel && !targetChannel.startsWith('@')) {
+        targetChannel = '@' + targetChannel;
+    }
+
+    await generateReport(msg.chat.id, cmdType, targetChannel);
+});
+
+
+// ==========================================
+// 🚀 BACKEND ORDER TRANSACTION TRIGGER (AXIOS)
+// ==========================================
+
+async function sendOrderDynamic(panelName, apiConfig, serviceId, link, quantity) {
+    try {
+        console.log([ROUTE ENGINE] Sending via ${panelName} | Link: ${link} | Qty: ${quantity} | Service: ${serviceId});
+        
+        const params = new URLSearchParams();
+        params.append("key", apiConfig.api_key || "");
+        params.append("action", "add");
+        params.append("service", serviceId.toString());
+        params.append("link", link);
+        params.append("quantity", quantity.toString());
+        
+        const response = await axios.post(apiConfig.url, params.toString(), {
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            timeout: 10000 // 10 seconds timeout protection
+        });
+
+        const data = response.data;
+        console.log([API RESPONSE] ${panelName}:, JSON.stringify(data));
+        
+        if (data && data.order) {
+            console.log(Order Placed Success ID: ${data.order});
+            return { success: true, orderId: data.order };
+        } else if (data && data.error) {
+            console.log(Panel API returned Error: ${data.error});
+            return { success: false, error: data.error };
+        } else {
+            return { success: false, error: "Structure format unknown" };
+        }
+    } catch (err) {
+        console.log(Connection Failure on ${panelName}:  + err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+
+// ==========================================
+// 📢 AUTOMATED BOT CHANNEL POST HANDLER
+// ==========================================
+
+bot.on('channel_post', async (msg) => {
+    try {
+        const username = msg.sender_chat?.username || msg.chat?.username;
+        const measure_id = msg.message_id;
+        
+        if (!username || !measure_id) return;
+
+        // Unique Key Protection (Duplicate posts filter)
+        const uniqKey = username.toLowerCase() + "_" + measure_id;
+        if (processedLogs.includes(uniqKey)) {
+            console.log("Duplicate Post Detected and Skipped: " + uniqKey);
+            return;
+        }
+        processedLogs.push(uniqKey);
+        if (processedLogs.length > 100) processedLogs.shift();
+
+        const cleanUsername = username.replace("@", "");
+        const currentChannelName = "@" + cleanUsername.toLowerCase();
+        
+        // Dynamic link generation for panel orders
+        const targetLink = "https://t.me" + cleanUsername + "/" + measure_id;
+        console.log("New Post Trigger Captured:", targetLink);
+
+        // Database Configuration Lookup for this channel
+        const chConfig = await db.get(SELECT * FROM channels WHERE lower(username) = ?, [currentChannelName]);
+
+        // Authorization Check
+        if (!chConfig) {
+            console.log(Channel ${currentChannelName} system database mein whitelist nahi hai.);
+            return;
+        }
+
+        // Status Verification Check
+        if (chConfig.status !== 'ON') {
+            console.log(Automation OFF status mode for ${currentChannelName}. Skipping.);
+            return;
+        }
+
+        // Service Mapping Check
+        if (!chConfig.panel_name || !chConfig.service_number) {
+            console.log(Configuration incomplete (Panel or Service missing) for ${currentChannelName}.);
+            return;
+        }
+
+        // Fetch target routing panel configurations
+        const panelConfig = await db.get(SELECT * FROM panels WHERE name = ?, [chConfig.panel_name]);
+        if (!panelConfig) {
+            console.log(Mapped Panel '${chConfig.panel_name}' system panels list mein nahi mila.);
+            return;
+        }
+
+        // Set Quantity dynamically from Admin inputs (burst distribution logic)
+        const baseQty = chConfig.quantity;
+        
+        // Aapki standard burst delivery split scheme (10, 30, 50 ke sequential chunks)
+        // Yahan hum base config ke ratios mein delay bursts chalayenge.
+        const burstSplits = [
+            Math.round(baseQty * 0.1) || 10,
+            Math.round(baseQty * 0.3) || 30,
+            Math.round(baseQty * 0.6) || 50
+        ];
+        
+        let trackSuccessCount = 0;
+
+        for (let burstQty of burstSplits) {
+            const result = await sendOrderDynamic(
+                chConfig.panel_name, 
+                panelConfig, 
+                chConfig.service_number, 
+                targetLink, 
+                burstQty
+            );
+
+if (result.success) {
+                trackSuccessCount += burstQty;
+                // Logs database mein data dynamically register karein real-time stats ke liye
+                await db.run(INSERT INTO logs (channel, link, quantity, status) VALUES (?, ?, ?, ?),
+                    [chConfig.username, targetLink, burstQty, 'SUCCESS']);
+            } else {
+                await db.run(INSERT INTO logs (channel, link, quantity, status) VALUES (?, ?, ?, ?),
+                    [chConfig.username, targetLink, burstQty, FAILED: ${result.error}]);
+                console.log(Burst process execution halted due to response failure.);
+                break;
+            }
+
+            console.log(Burst item (${burstQty}) processed. Waiting 30 seconds interval cooldown...);
+            await new Promise(r => setTimeout(r, 30000));
+        }
+
+        console.log([PROCESS FINISHED] Processed total ${trackSuccessCount} orders dynamically for ${currentChannelName});
+
+    } catch (err) {
+        console.error("System Core Handler Error: " + err.message);
+    }
+});
+
+// Anti-crash standard error handlers
+bot.on('polling_error', (error) => console.log('[POLLING ERROR]: ' + error.message));
+bot.on('error', (error) => console.log('[GLOBAL ERROR]: ' + error.message));
