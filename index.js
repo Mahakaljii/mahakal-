@@ -1,4 +1,4 @@
-𝙐𝙍𝙑𝙄 𝙂𝘼𝙈𝙀𝙍:
+
 const TelegramBot = require('node-telegram-bot-api');
 
 console.log('Bot Initialization Started...');
@@ -27,7 +27,10 @@ console.log('Bot Started Successfully and Polling...');
 
 // YOUR CHANNELS
 const CHANNELS = [
-    '@URVIGAMER',
+    '@TRICKVIP,
+    '@LIONMODEON',
+    '@GROW_MASTER',
+    '@VIPGODGAMER',
     '@Raja_Game_bunny'
 ];
 
