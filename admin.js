@@ -1,4 +1,4 @@
-GOD TRADERS:
+
 const {
   isOwner,
   normalizeChannel
