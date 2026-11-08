@@ -1,4 +1,4 @@
-GOD TRADERS:
+
 "use strict";
 
 const {
